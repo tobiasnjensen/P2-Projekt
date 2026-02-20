@@ -1,10 +1,11 @@
 from socket import *
 HOST = '' # Symbolic name meaning all available interfaces
-PORT = 9999 # Arbitrary non-privileged port
+PORT = 15412 # Arbitrary non-privileged port
 CONN_COUNTER = 0 # Counter for connections
 BUFFER_SIZE = 1024 # Receive Buffer size (power of 2)
 s = socket(AF_INET,SOCK_DGRAM) # IPv4, UDP
 s.bind((HOST, PORT)) # Bind sockect to the address
+
 print('UDP server running...')
 print('Listening for incoming connections in port '+str(PORT))
 while True: # Server infinite loop
