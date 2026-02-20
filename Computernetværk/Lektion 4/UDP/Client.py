@@ -1,5 +1,5 @@
 from socket import *
-SERVER_IP = "127.0.0.1"
+SERVER_IP = "192.168.56.1" 
 SERVER_PORT = 9999
 BUFFER_SIZE = 1024
 s = socket(AF_INET,SOCK_DGRAM)
