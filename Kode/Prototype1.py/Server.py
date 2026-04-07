@@ -87,6 +87,6 @@ if __name__ == "__main__":
             pos_dict["p4"], distances["d4"]
         )
         time.sleep(1) #Tilføj en lille forsinkelse for at undgå at spamme outputtet
-        print(f"Estimated Position: x={result[0]}, y={result[1]}, z={result[2]}")
+        print(f"Estimated Position: x={result[0]:.2f}, y={result[1]:.2f}, z={result[2]:.2f}")
 
 

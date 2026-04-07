@@ -34,6 +34,7 @@ def tri_lat(p1, d1, p2, d2, p3, d3, p4, d4):
     #Solve 
     solution = np.linalg.solve(A, b) #Løser det lineære ligningssystem for at finde x, y og z koordinaterne for den ukendte position
     
+
     return solution  #Returnerer løsning som et array (vektor) med x, y og z koordinater
 
 #--------Main--------#
@@ -49,5 +50,5 @@ if __name__ == "__main__":
     d4 = 4.24
     #Kald trilateration funktionen med testdata og print resultatet (Skal plottes laves et live plot senere, når vi kan måle i realtid)
     result = tri_lat(p1, d1, p2, d2, p3, d3, p4, d4)
-    print(f"Position: x={result[0]}, y={result[1]}, z={result[2]}")
+    print(f"Position: x={result[0]:.2f}, y={result[1]:.2f}, z={result[2]:.2f}")
 
