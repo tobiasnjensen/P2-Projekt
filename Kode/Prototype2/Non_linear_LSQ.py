@@ -17,6 +17,12 @@ def tri_lat(p1, d1, p2, d2, p3, d3, p4, d4) -> np.ndarray:
     returns:
     result.x: Den estimerede position (x, y, z) for det ukendte punkt
     """
+    if (d1<0 or d2<0 or d3<0 or d4<0): #Vi kan ikke have negative afstande
+        print('Error - distances cannot be negative')
+        return np.array([float("NaN"), float("NaN"), float("NaN")])
+    elif (p1[0]==p2[0]==p3[0]==p4[0]==0 or p1[1]==p2[1]==p3[1]==p4[1]==0 or p1[2]==p2[2]==p3[2]==p4[2]==0): #Hvis f.eks. alle x-koordinater er ens, så kan vi ikke bestemme en unik position i 3D-rummet
+        print('Error - anchors cannot be collinear')
+        return np.array([float("NaN"), float("NaN"), float("NaN")])
     anchors = np.array([p1, p2, p3, p4])
     distances = np.array([d1, d2, d3, d4])
 
@@ -43,7 +49,7 @@ if __name__ == "__main__":
     d2 = 4
     p3 = (0, 6, 0)
     d3 = 5
-    p4 = (3, 0, 2)
+    p4 = (3, 0, 0)
     d4 = 4.24
 
     result = tri_lat(p1, d1, p2, d2, p3, d3, p4, d4)
