@@ -40,9 +40,9 @@ async def get_db():
     return await asyncpg.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", 5432)),
-        database=os.getenv("DB_NAME", "drones"),
+        database=os.getenv("DB_NAME", "DroneDatabase"),
         user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", ""),
+        password=os.getenv("DB_PASSWORD", "Spatomando"),
     )
 
 
