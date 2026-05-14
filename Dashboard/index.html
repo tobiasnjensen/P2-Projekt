@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drone Detection</title>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       CSS — controls how everything looks
+  ════════════════════════════════════════════════════════════ -->
+  <style>
+
+    /* ── Reset & base ─────────────────────────────────────────── */
+    * {
+      box-sizing: border-box;   /* padding/border are included in width */
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      background: #f0f0ef;
+      color: #1a1a18;
+    }
+
+    /* ── Top bar ──────────────────────────────────────────────── */
+    .topbar {
+      display: flex;                  /* puts children side by side */
+      align-items: center;            /* vertically centres them */
+      justify-content: space-between; /* pushes left and right groups apart */
+      padding: 14px 20px;
+      background: #ffffff;
+      border-bottom: 1px solid #e0e0de;
+    }
+
+    .topbar-title {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .topbar-sub {
+      font-size: 13px;
+      color: #888;
+      margin-top: 3px;
+    }
+
+    /* Small green "Live" badge in the top right */
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: #16a34a;
+      background: #dcfce7;
+      border-radius: 99px;
+      padding: 5px 14px;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;             /* circle */
+      background: #16a34a;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+
+    /* ── Stats row ────────────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr); /* 4 equal columns */
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #e0e0de;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .stat-icon {
+      font-size: 22px;
+    }
+
+    .stat-val {
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    .stat-lbl {
+      font-size: 12px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    /* ── Main two-column layout ───────────────────────────────── */
+    .main {
+      display: grid;
+      grid-template-columns: 270px 1fr; /* sidebar | map */
+      gap: 12px;
+      padding: 0 16px 16px;
+    }
+
+    /* Left column stacks its panels vertically */
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Generic panel (white card) ───────────────────────────── */
+    .panel {
+      background: #ffffff;
+      border: 1px solid #e0e0de;
+      border-radius: 10px;
+      overflow: hidden;               /* keeps children inside rounded corners */
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      border-bottom: 1px solid #e0e0de;
+      font-size: 13px;
+      font-weight: 500;
+      color: #555;
+    }
+
+    /* ── Query form ───────────────────────────────────────────── */
+    .query-form {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e0e0de;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    .query-form input {
+      width: 100%;
+      padding: 7px 10px;
+      font-size: 13px;
+      border: 1px solid #d0d0ce;
+      border-radius: 6px;
+      background: #fafafa;
+      color: #1a1a18;
+      outline: none;
+    }
+
+    .query-form input:focus {
+      border-color: #2563eb;          /* blue outline when clicked */
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Base button style */
+    .btn {
+      flex: 1;
+      padding: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid #d0d0ce;
+      background: #f5f5f5;
+      color: #1a1a18;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background: #e8e8e8;
+    }
+
+    /* Blue primary button */
+    .btn-primary {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+
+    .btn-primary:hover {
+      background: #bfdbfe;
+    }
+
+    /* ── Drone list ───────────────────────────────────────────── */
+    .drone-list {
+      overflow-y: auto;               /* scroll if too many drones */
+      max-height: 260px;
+    }
+
+    .drone-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #f0f0ee;
+      cursor: pointer;
+    }
+
+    .drone-row:hover {
+      background: #f8f8f8;
+    }
+
+    /* Blue tint when this drone is selected */
+    .drone-row.selected {
+      background: #eff6ff;
+    }
+
+    .drone-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;             /* makes it a circle */
+      flex-shrink: 0;                 /* never shrink, always stay round */
+    }
+
+    .drone-name {
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .drone-coords {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .drone-badge {
+      margin-left: auto;              /* pushes badge to the far right */
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: #f0f0f0;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    /* ── Detail panel ─────────────────────────────────────────── */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 14px 16px;
+    }
+
+    .detail-cell {
+      background: #f8f8f8;
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .detail-lbl {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 3px;
+    }
+
+    .detail-val {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* ── Flight log table ─────────────────────────────────────── */
+    .table-wrap {
+      overflow-y: auto;
+      max-height: 180px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      font-size: 11px;
+      font-weight: 500;
+      color: #888;
+      text-align: left;
+      padding: 8px 14px;
+      border-bottom: 1px solid #e0e0de;
+      position: sticky;               /* header stays visible when scrolling */
+      top: 0;
+      background: #ffffff;
+    }
+
+    td {
+      font-size: 12px;
+      padding: 7px 14px;
+      border-bottom: 1px solid #f0f0ee;
+      color: #333;
+    }
+
+    tr:hover td {
+      background: #f8f8f8;
+    }
+
+    /* ── Map area ─────────────────────────────────────────────── */
+    .map-wrap {
+      position: relative;             /* lets children use position: absolute */
+      background: #f5f5f3;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 420px;
+    }
+
+    /* Small info box that appears when you hover a drone */
+    .map-tooltip {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: #ffffff;
+      border: 1px solid #e0e0de;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #555;
+      line-height: 1.8;
+      pointer-events: none;           /* mouse clicks pass through it */
+    }
+
+    .map-tooltip strong {
+      display: block;
+      color: #1a1a18;
+      margin-bottom: 2px;
+    }
+
+    /* Axis labels in the corners of the map */
+    .axis-label {
+      position: absolute;
+      font-size: 11px;
+      color: #aaa;
+      background: #fff;
+      padding: 2px 7px;
+      border-radius: 99px;
+      border: 1px solid #e0e0de;
+    }
+
+    /* ── Empty state message ──────────────────────────────────── */
+    .empty {
+      padding: 24px;
+      text-align: center;
+      font-size: 13px;
+      color: #aaa;
+    }
+
+    /* ── Scrollbar styling ────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #d0d0ce; border-radius: 2px; }
+
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       HTML — the structure of the page
+  ════════════════════════════════════════════════════════════ -->
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">🛸 Drone Detection</div>
+      <div class="topbar-sub">Local coordinate space · x / y / z (altitude)</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span id="api-status" style="font-size:12px; color:#aaa;">Connecting…</span>
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        Live
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats row -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-icon">🛸</div>
+      <div>
+        <div class="stat-val" id="s-total">—</div>
+        <div class="stat-lbl">Tracked</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div>
+        <div class="stat-val" style="color:#16a34a;" id="s-active">—</div>
+        <div class="stat-lbl">Active</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📈</div>
+      <div>
+        <div class="stat-val" style="color:#2563eb;" id="s-maxalt">—</div>
+        <div class="stat-lbl">Max altitude</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🕐</div>
+      <div>
+        <div class="stat-val" style="font-size:15px; margin-top:3px;" id="s-time">—</div>
+        <div class="stat-lbl">Last update</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main layout: sidebar + map -->
+  <div class="main">
+
+    <!-- Left sidebar -->
+    <div class="left-col">
+
+      <!-- Query form -->
+      <div class="panel">
+        <div class="panel-header">🔍 Query database</div>
+        <div class="query-form">
+          <div>
+            <div class="field-label">MAC address</div>
+            <input id="q-mac" type="text" placeholder="e.g. AA:BB:CC or leave blank" />
+          </div>
+          <div>
+            <div class="field-label">From</div>
+            <input id="q-from" type="datetime-local" />
+          </div>
+          <div>
+            <div class="field-label">To</div>
+            <input id="q-to" type="datetime-local" />
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="runQuery()">Search</button>
+            <button class="btn" onclick="resetAll()">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drone list -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>Drones</span>
+          <span id="drone-count"
+            style="font-size:11px; background:#f0f0f0; padding:2px 8px; border-radius:99px;">
+            0
+          </span>
+        </div>
+        <div class="drone-list" id="drone-list">
+          <div class="empty">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Detail panel — hidden until a drone is selected -->
+      <div class="panel" id="detail-panel" style="display:none;">
+        <div class="panel-header">
+          <span id="detail-title">—</span>
+          <button class="btn" style="flex:0; padding:3px 10px; font-size:11px;"
+            onclick="clearSelection()">
+            Clear
+          </button>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-cell">
+            <div class="detail-lbl">MAC address</div>
+            <div class="detail-val" id="d-mac" style="font-size:12px;">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-lbl">Altitude (z)</div>
+            <div class="detail-val" id="d-z">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-lbl">Position x</div>
+            <div class="detail-val" id="d-x">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-lbl">Position y</div>
+            <div class="detail-val" id="d-y">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-lbl">First seen</div>
+            <div class="detail-val" id="d-first" style="font-size:12px;">—</div>
+          </div>
+          <div class="detail-cell">
+            <div class="detail-lbl">Last seen</div>
+            <div class="detail-val" id="d-last" style="font-size:12px;">—</div>
+          </div>
+        </div>
+
+        <!-- Flight log table -->
+        <div class="panel-header" style="border-top:1px solid #e0e0de;">
+          Flight log
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30px;">#</th>
+                <th>X</th>
+                <th>Y</th>
+                <th>Z (alt)</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="path-tbody"></tbody>
+          </table>
+        </div>
+
+      </div><!-- /detail-panel -->
+
+    </div><!-- /left-col -->
+
+    <!-- Map panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>📍 Top-down view (x / y plane)</span>
+        <span id="bounds-label" style="font-size:11px; color:#aaa;">Auto-scaling</span>
+      </div>
+      <div class="map-wrap">
+        <canvas id="map"></canvas>
+        <div class="map-tooltip" id="map-tooltip">Hover over a drone to see details</div>
+        <div class="axis-label" style="bottom:12px; right:12px;">→ x</div>
+        <div class="axis-label" style="top:52px; left:12px;">↑ y</div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+
+  <!-- ═══════════════════════════════════════════════════════════
+       JAVASCRIPT — all the logic and behaviour
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+
+    // ── Configuration ────────────────────────────────────────────
+    // Change this to the address where your Python API is running.
+    const API = 'http://localhost:8000';
+
+    // Colours used for each drone (cycles if there are more than 7)
+    const COLORS = ['#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#65a30d', '#dc2626'];
+
+
+    // ── State ────────────────────────────────────────────────────
+    // These variables hold the current state of the app.
+    // They are updated whenever new data arrives.
+
+    let drones    = [];    // list of all drone objects
+    let paths     = {};    // flight path points, keyed by drone id: { 1: [...], 2: [...] }
+    let bounds    = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
+    let selectedId = null; // the id of the currently selected drone, or null
+    let useRealApi = false; // becomes true once we successfully connect to your API
+    let tick = 0;          // counts animation frames — used to animate the pulse ring
+
+
+    // ── Helper functions ─────────────────────────────────────────
+
+    // Rounds a number to 1 decimal place, or returns '—' if it's null/undefined
+    function fmt(value, decimals = 1) {
+      if (value == null) return '—';
+      return Number(value).toFixed(decimals);
+    }
+
+    // Converts a timestamp string to a readable time like "14:32:07"
+    function fmtTime(timestamp) {
+      if (!timestamp) return '—';
+      const d = new Date(timestamp);
+      if (isNaN(d)) return timestamp; // return as-is if it's not a valid date
+      return d.toLocaleTimeString();
+    }
+
+    // Returns the colour for a given drone index
+    function colorFor(index) {
+      return COLORS[index % COLORS.length];
+    }
+
+
+    // ── Demo data ────────────────────────────────────────────────
+    // Used when the API is not reachable — so you can see and test
+    // the dashboard without running the Python server.
+
+    function makeDemoData() {
+      return [
+        { id: 1, mac_adresse: 'AA:BB:CC:11:22:33', x: 2.1, y: 3.4, z: 1.2,
+          first_seen: new Date(Date.now() - 3600000).toISOString(),
+          last_seen: new Date().toISOString() },
+        { id: 2, mac_adresse: 'DD:EE:FF:44:55:66', x: 6.5, y: 7.1, z: 0.8,
+          first_seen: new Date(Date.now() - 1800000).toISOString(),
+          last_seen: new Date().toISOString() },
+        { id: 3, mac_adresse: '11:22:33:AA:BB:CC', x: 4.8, y: 1.9, z: 2.1,
+          first_seen: new Date(Date.now() - 900000).toISOString(),
+          last_seen: new Date().toISOString() },
+        { id: 4, mac_adresse: '44:55:66:DD:EE:FF', x: 8.2, y: 5.5, z: 0.3,
+          first_seen: new Date(Date.now() - 600000).toISOString(),
+          last_seen: new Date().toISOString() },
+      ];
+    }
+
+    // Creates a fake flight path for a drone (a series of positions over time)
+    function makeDemoPath(drone) {
+      const points = [];
+      let x = drone.x, y = drone.y, z = drone.z;
+      for (let i = 0; i < 16; i++) {
+        x += (Math.random() - 0.5) * 0.8;
+        y += (Math.random() - 0.5) * 0.8;
+        z = Math.max(0, z + (Math.random() - 0.5) * 0.3);
+        points.push({
+          x, y, z,
+          timestamp: new Date(Date.now() - (16 - i) * 15000).toISOString()
+        });
+      }
+      return points;
+    }
+
+
+    // ── API calls ────────────────────────────────────────────────
+    // These functions fetch data from your Python FastAPI server.
+    // If the server is not running, they return null and we fall
+    // back to demo data instead.
+
+    async function fetchDrones() {
+      try {
+        const response = await fetch(`${API}/drones`);
+        if (!response.ok) throw new Error('Bad response');
+        return await response.json();
+      } catch (e) {
+        return null; // API not reachable
+      }
+    }
+
+    async function fetchBounds() {
+      try {
+        const response = await fetch(`${API}/bounds`);
+        if (!response.ok) throw new Error('Bad response');
+        return await response.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function fetchPath(deviceId) {
+      try {
+        const response = await fetch(`${API}/drones/${deviceId}/path`);
+        if (!response.ok) throw new Error('Bad response');
+        return await response.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function fetchSearch(mac, fromTime, toTime) {
+      try {
+        let url = `${API}/drones/search?`;
+        if (mac)      url += `mac_adresse=${encodeURIComponent(mac)}&`;
+        if (fromTime) url += `from_time=${encodeURIComponent(fromTime)}&`;
+        if (toTime)   url += `to_time=${encodeURIComponent(toTime)}&`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Bad response');
+        return await response.json();
+      } catch (e) {
+        return null;
+      }
+    }
+
+
+    // ── Stats bar ────────────────────────────────────────────────
+    // Updates the four number cards at the top of the page.
+
+    function updateStats() {
+      document.getElementById('s-total').textContent = drones.length;
+      document.getElementById('s-active').textContent = drones.length;
+      const maxZ = drones.reduce((max, d) => Math.max(max, d.z || 0), 0);
+      document.getElementById('s-maxalt').textContent = fmt(maxZ) + 'm';
+      document.getElementById('s-time').textContent = new Date().toLocaleTimeString();
+    }
+
+
+    // ── Drone list ───────────────────────────────────────────────
+    // Builds the clickable list of drones in the left sidebar.
+
+    function buildList(list) {
+      const container = document.getElementById('drone-list');
+      document.getElementById('drone-count').textContent = list.length;
+
+      // If the list is empty, show a message instead
+      if (list.length === 0) {
+        container.innerHTML = '<div class="empty">No drones found</div>';
+        return;
+      }
+
+      // Clear the container, then add one row per drone
+      container.innerHTML = '';
+      list.forEach(function(drone) {
+        const index = drones.indexOf(drone);
+        const color = colorFor(index);
+        const isSelected = selectedId === drone.id;
+
+        // Create a div for this drone row
+        const row = document.createElement('div');
+        row.className = 'drone-row' + (isSelected ? ' selected' : '');
+
+        // Fill it with HTML
+        row.innerHTML = `
+          <div class="drone-dot" style="background: ${color};"></div>
+          <div>
+            <div class="drone-name">Device ${drone.id}</div>
+            <div class="drone-coords">${drone.mac_adresse}</div>
+          </div>
+          <span class="drone-badge">x:${fmt(drone.x)} y:${fmt(drone.y)}</span>
+        `;
+
+        // When clicked, select this drone
+        row.onclick = function() { select(drone.id); };
+
+        container.appendChild(row);
+      });
+    }
+
+
+    // ── Select a drone ───────────────────────────────────────────
+    // Called when the user clicks a drone row or a dot on the map.
+    // Shows the detail panel and flight log for that drone.
+
+    async function select(id) {
+      // If the same drone is clicked again, deselect it
+      if (selectedId === id) {
+        clearSelection();
+        return;
+      }
+
+      selectedId = id;
+      buildList(drones); // rebuild list so the selected row gets highlighted
+
+      const drone = drones.find(function(d) { return d.id === id; });
+      if (!drone) return;
+
+      // Show the detail panel
+      const panel = document.getElementById('detail-panel');
+      panel.style.display = 'block';
+
+      // Fill in the detail fields
+      document.getElementById('detail-title').textContent = `Device ${drone.id}`;
+      document.getElementById('d-mac').textContent   = drone.mac_adresse;
+      document.getElementById('d-x').textContent     = fmt(drone.x) + 'm';
+      document.getElementById('d-y').textContent     = fmt(drone.y) + 'm';
+      document.getElementById('d-z').textContent     = fmt(drone.z) + 'm';
+      document.getElementById('d-first').textContent = fmtTime(drone.first_seen);
+      document.getElementById('d-last').textContent  = fmtTime(drone.last_seen);
+
+      // Fetch the flight path (real API or demo)
+      let points = useRealApi ? await fetchPath(id) : null;
+      if (!points) points = makeDemoPath(drone);
+      paths[id] = points;
+
+      // Fill the flight log table
+      const tbody = document.getElementById('path-tbody');
+      tbody.innerHTML = '';
+      points.forEach(function(pt, i) {
+        tbody.innerHTML += `
+          <tr>
+            <td style="color:#aaa;">${i + 1}</td>
+            <td>${fmt(pt.x)}</td>
+            <td>${fmt(pt.y)}</td>
+            <td>${fmt(pt.z)}</td>
+            <td style="color:#aaa;">${fmtTime(pt.timestamp)}</td>
+          </tr>
+        `;
+      });
+    }
+
+    // Hides the detail panel and deselects everything
+    function clearSelection() {
+      selectedId = null;
+      buildList(drones);
+      document.getElementById('detail-panel').style.display = 'none';
+    }
+
+
+    // ── Query / search ───────────────────────────────────────────
+    // Called when the user clicks the Search button.
+
+    async function runQuery() {
+      const mac      = document.getElementById('q-mac').value.trim();
+      const fromTime = document.getElementById('q-from').value;
+      const toTime   = document.getElementById('q-to').value;
+
+      if (useRealApi) {
+        // Ask the Python API to filter
+        const matchingIds = await fetchSearch(mac, fromTime, toTime);
+        if (matchingIds) {
+          const filtered = drones.filter(function(d) {
+            return matchingIds.includes(d.id);
+          });
+          buildList(filtered);
+          return;
+        }
+      }
+
+      // Fallback: filter locally by MAC address
+      const filtered = mac
+        ? drones.filter(function(d) {
+            return d.mac_address.toLowerCase().includes(mac.toLowerCase());
+          })
+        : drones;
+
+      buildList(filtered);
+    }
+
+    // Clears all query inputs and resets the list
+    function resetAll() {
+      document.getElementById('q-mac').value  = '';
+      document.getElementById('q-from').value = '';
+      document.getElementById('q-to').value   = '';
+      clearSelection();
+      buildList(drones);
+    }
+
+
+    // ── Map drawing ──────────────────────────────────────────────
+    // The map is drawn on an HTML <canvas> element.
+    // Every animation frame, we clear it and redraw everything.
+
+    const canvas = document.getElementById('map');
+    const ctx    = canvas.getContext('2d'); // the "pen" we draw with
+    const PAD    = 48; // padding in pixels around the edge of the map
+
+    // Converts a drone's x/y coordinates into canvas pixel positions.
+    // This is what makes the map auto-scale to your coordinate space.
+    function toCanvas(x, y) {
+      const w = canvas.width  - PAD * 2;
+      const h = canvas.height - PAD * 2;
+
+      // How far across the coordinate space is this point? (0.0 to 1.0)
+      const ratioX = bounds.x_max === bounds.x_min
+        ? 0.5
+        : (x - bounds.x_min) / (bounds.x_max - bounds.x_min);
+
+      // y is flipped because canvas 0 is at the top, but we want 0 at the bottom
+      const ratioY = bounds.y_max === bounds.y_min
+        ? 0.5
+        : (y - bounds.y_min) / (bounds.y_max - bounds.y_min);
+
+      return {
+        cx: PAD + ratioX * w,
+        cy: PAD + (1 - ratioY) * h
+      };
+    }
+
+    function drawMap() {
+      tick++;
+
+      // Make canvas match its displayed size (important for sharpness)
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+
+      // Background
+      ctx.fillStyle = '#f5f5f3';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+      }
+
+      // Border around the coordinate area
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.strokeRect(PAD, PAD, canvas.width - PAD * 2, canvas.height - PAD * 2);
+
+      // Update the bounds label (top right of map header)
+      const xRange = (bounds.x_max - bounds.x_min) || 1;
+      const yRange = (bounds.y_max - bounds.y_min) || 1;
+      document.getElementById('bounds-label').textContent =
+        `x: 0–${fmt(xRange, 0)}m · y: 0–${fmt(yRange, 0)}m`;
+
+      // Draw flight paths (dashed lines connecting historical positions)
+      Object.entries(paths).forEach(function([id, points]) {
+        if (points.length < 2) return;
+        const drone = drones.find(function(d) { return d.id == id; });
+        const color = drone ? colorFor(drones.indexOf(drone)) : '#888';
+        const isSelected = selectedId == id;
+
+        ctx.beginPath();
+        points.forEach(function(pt, i) {
+          const { cx, cy } = toCanvas(pt.x, pt.y);
+          if (i === 0) ctx.moveTo(cx, cy);
+          else         ctx.lineTo(cx, cy);
+        });
+
+        ctx.strokeStyle = color + (isSelected ? 'cc' : '44'); // cc = 80% opacity, 44 = 27%
+        ctx.lineWidth   = isSelected ? 2 : 1;
+        ctx.setLineDash([4, 4]); // dashed line
+        ctx.stroke();
+        ctx.setLineDash([]); // reset to solid for next drawing
+      });
+
+      // Draw each drone as a coloured dot with a label
+      drones.forEach(function(drone, index) {
+        if (drone.x == null || drone.y == null) return;
+
+        const { cx, cy } = toCanvas(drone.x, drone.y);
+        const color      = colorFor(index);
+        const isSelected = selectedId === drone.id;
+
+        // Animated pulse ring around the selected drone
+        if (isSelected) {
+          const pulseRadius = 16 + (tick % 24) * 0.5;
+          ctx.beginPath();
+          ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = color + '44';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // Main dot
+        ctx.beginPath();
+        ctx.arc(cx, cy, isSelected ? 9 : 6, 0, Math.PI * 2);
+        ctx.fillStyle   = color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth   = 1.5;
+        ctx.stroke();
+
+        // Label: device ID
+        ctx.fillStyle = '#222';
+        ctx.font      = `${isSelected ? 12 : 11}px Arial`;
+        ctx.fillText(`#${drone.id}`, cx + 11, cy + 4);
+
+        // Label: altitude below
+        if (drone.z != null) {
+          ctx.fillStyle = '#888';
+          ctx.font      = '10px Arial';
+          ctx.fillText(`z: ${fmt(drone.z)}m`, cx + 11, cy + 16);
+        }
+      });
+
+      // Keep redrawing every animation frame (~60 times per second)
+      requestAnimationFrame(drawMap);
+    }
+
+
+    // ── Map interaction ──────────────────────────────────────────
+    // Hover to show tooltip, click to select a drone.
+
+    canvas.addEventListener('mousemove', function(e) {
+      const rect   = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Check if the mouse is close to any drone dot
+      let hovered = null;
+      drones.forEach(function(drone) {
+        if (drone.x == null) return;
+        const { cx, cy } = toCanvas(drone.x, drone.y);
+        if (Math.hypot(mouseX - cx, mouseY - cy) < 14) {
+          hovered = drone;
+        }
+      });
+
+      const tooltip = document.getElementById('map-tooltip');
+      if (hovered) {
+        tooltip.innerHTML = `
+          <strong>Device ${hovered.id}</strong>
+          ${hovered.mac_adresse}<br>
+          x: ${fmt(hovered.x)}m &nbsp; y: ${fmt(hovered.y)}m &nbsp; z: ${fmt(hovered.z)}m
+        `;
+      } else {
+        tooltip.textContent = 'Hover over a drone to see details';
+      }
+    });
+
+    canvas.addEventListener('click', function(e) {
+      const rect   = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      drones.forEach(function(drone) {
+        if (drone.x == null) return;
+        const { cx, cy } = toCanvas(drone.x, drone.y);
+        if (Math.hypot(mouseX - cx, mouseY - cy) < 14) {
+          select(drone.id);
+        }
+      });
+    });
+
+
+    // ── Main refresh loop ────────────────────────────────────────
+    // Runs every 3 seconds. Tries to fetch real data from the API.
+    // If not available, simulates movement on the demo data.
+
+    async function refresh() {
+      const realData = await fetchDrones();
+
+      if (realData !== null) {
+        // Real API is working (even if the list is empty)
+        drones     = realData;
+        useRealApi = true;
+        document.getElementById('api-status').textContent = 'Connected to database';
+        document.getElementById('api-status').style.color = '#16a34a';
+        paths = {}; // clear any leftover paths when database is empty
+
+        if (drones.length > 0) {
+          // Fetch coordinate bounds for auto-scaling the map
+          const b = await fetchBounds();
+          if (b && b.x_min != null) {
+            bounds = b;
+          } else {
+            bounds = {
+              x_min: Math.min(...drones.map(function(d) { return d.x || 0; })),
+              x_max: Math.max(...drones.map(function(d) { return d.x || 0; })),
+              y_min: Math.min(...drones.map(function(d) { return d.y || 0; })),
+              y_max: Math.max(...drones.map(function(d) { return d.y || 0; })),
+            };
+          }
+        }
+
+      } else {
+        // API not reachable — use demo data
+        document.getElementById('api-status').textContent = 'Using demo data';
+        document.getElementById('api-status').style.color = '#aaa';
+
+        if (drones.length === 0) {
+          // First load — create demo drones and their paths
+          drones = makeDemoData();
+          bounds = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
+          drones.forEach(function(d) { paths[d.id] = makeDemoPath(d); });
+        } else {
+          // Simulate movement: nudge each drone slightly
+          drones.forEach(function(drone) {
+            drone.x        += (Math.random() - 0.5) * 0.25;
+            drone.y        += (Math.random() - 0.5) * 0.25;
+            drone.z         = Math.max(0, drone.z + (Math.random() - 0.5) * 0.15);
+            drone.last_seen = new Date().toISOString();
+
+            // Add the new position to this drone's path
+            if (paths[drone.id]) {
+              paths[drone.id].push({
+                x: drone.x, y: drone.y, z: drone.z,
+                timestamp: drone.last_seen
+              });
+              // Keep the path at most 40 points
+              if (paths[drone.id].length > 40) paths[drone.id].shift();
+            }
+          });
+        }
+      }
+
+      buildList(drones);
+      updateStats();
+
+      // Refresh the detail panel if a drone is selected
+      if (selectedId) select(selectedId);
+    }
+
+
+    // ── Start everything ─────────────────────────────────────────
+    refresh();                          // load data immediately
+    setInterval(refresh, 3000);         // then every 3 seconds
+    drawMap();                          // start drawing the map
+
+  </script>
+</body>
+</html>
