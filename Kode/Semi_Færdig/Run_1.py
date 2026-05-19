@@ -219,8 +219,8 @@ def main():
     print(f"[*] RTL8187 RSSI offset: +{args.offset} dBm")
     print(f"[*] Rolling average window: {args.window} packets")
 
-    bpf_filter = ( #Sætter et BPF-filter hvis --beacons-only er aktivt, ellers filtreres der ikke på pakketype
-        "type mgt subtype beacon or type mgt subtype probe-resp"
+    bpf_filter = ( #Sætter et Beacon/probe-resp-filter hvis --beacons-only er aktivt, ellers filtreres der ikke på pakketype
+        "type mgt subtype beacon or type mgt subtype probe-resp" 
         if args.beacons_only else None
     )
 
