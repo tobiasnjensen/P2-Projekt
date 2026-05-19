@@ -20,7 +20,7 @@ from rich.table import Table
 from rich.live import Live
 from IRLS import tri_lat_irls
 from termcolor import colored
-from identify import update_history, is_drone    
+from identify import update_history, is_drone, _first_seen
 from discord_alarm import send_discord_alarm
 
 #-----------------------------------------#
@@ -42,7 +42,7 @@ ANCHORS = {
 
 #--------Database Konfiguration--------#
 DB_CONFIG = {
-    "host": "192.168.0.102",     #Skift til ip-adressen på din PostgreSQL server, eller localhost hvis det er på samme maskine
+    "host": "192.168.0.104",     #Skift til ip-adressen på din PostgreSQL server, eller localhost hvis det er på samme maskine
     "port": 5432,                
     "database": "DroneDatabase", 
     "user": "tobi",              #Tobias username = tobi
@@ -57,7 +57,7 @@ positions         = {}
 positions_lock    = threading.Lock()
 packet_queue      = queue.Queue()
 console           = Console()
-
+alarmed_bssids    = set()
 
 #-----------------------------------------#
 #                Functions                #
@@ -165,9 +165,11 @@ def try_trilaterate(bssid):
             positions[bssid] = {"position": x_hat, "timestamp": timestamp}
         gem_position(db_conn, bssid, float(x_hat[0]), float(x_hat[1]), float(x_hat[2]))
         update_history(bssid, float(x_hat[0]), float(x_hat[1]), float(x_hat[2]), time.time()) #Opdaterer historikken for denne BSSID i identik.py
-        if is_drone(bssid): #Tjekker om denne BSSID opfører sig som en drone baseret på historikken i identik.py
+        if is_drone(bssid) and bssid not in alarmed_bssids:
+            alarmed_bssids.add(bssid)
+            elapsed = time.time() - _first_seen[bssid]
             console.print(f"[bold red]DRONE DETEKTERET: {bssid}[/bold red]")
-            send_discord_alarm(f"@Drone detekteret: {bssid} ved position ({x_hat[0]:.2f}, {x_hat[1]:.2f}, {x_hat[2]:.2f})")
+            print(f"Tid fra første måling til klassificering: {elapsed:.2f} sekunder")
 
         with measurements_lock:
             measurements[bssid] = {}  # Ryd op i målinger for denne BSSID efter trilateration
@@ -208,7 +210,6 @@ def worker_thread():
 
 if __name__ == "__main__":
     db_conn = test_forbindelse()
-
     threads = [
         threading.Thread(target=receiver_thread, daemon=True),
         threading.Thread(target=worker_thread,   daemon=True),
