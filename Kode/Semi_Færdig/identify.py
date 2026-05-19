@@ -24,12 +24,13 @@ MAX_SPEED         = 20.0  # Maksimal hastighed i m/s — filtrerer biler/fly fra
 
 # Intern historik: { bssid -> deque af (x, y, z, t) }
 _history = {}
+_first_seen = {}
 
-    
 def update_history(bssid, x, y, z, timestamp):
     """Tilføjer en ny position med tidsstempel til historikken for det givne BSSID."""
     if bssid not in _history:
         _history[bssid] = deque(maxlen=MAX_HISTORY)
+        _first_seen[bssid] = timestamp  # Gem kun første gang
     _history[bssid].append((x, y, z, timestamp))
 
 
