@@ -15,7 +15,7 @@ from datetime import datetime
 from scapy.all import sniff, RadioTap, Dot11, Dot11Beacon, Dot11ProbeResp
 
 #Server setup
-SERVER_IP = "192.168.0.100" 
+SERVER_IP = "192.168.0.108" 
 UDP_PORT = 6769
 
 #RTL8187 driver offset
@@ -28,7 +28,7 @@ ROLLING_WINDOW = int(input("Enter rolling average window size (default 10): ") o
 
 stop_event = threading.Event() #Opretter et threading Event-objekt der bruges til at stoppe sniffing-loopet på tværs af tråde
 
-def rssi_to_distance(rssi, tx_power=-17.1, path_loss_exp=2.7) -> float:
+def rssi_to_distance(rssi, tx_power=-13, path_loss_exp=2.7) -> float:
     """
     Konverterer en RSSI-værdi til en estimeret afstand i meter ved hjælp af log-distance path loss modellen.
     args:
@@ -219,8 +219,8 @@ def main():
     print(f"[*] RTL8187 RSSI offset: +{args.offset} dBm")
     print(f"[*] Rolling average window: {args.window} packets")
 
-    bpf_filter = ( #Sætter et Beacon/probe-resp-filter hvis --beacons-only er aktivt, ellers filtreres der ikke på pakketype
-        "type mgt subtype beacon or type mgt subtype probe-resp" 
+    bpf_filter = ( #Sætter et BPF-filter hvis --beacons-only er aktivt, ellers filtreres der ikke på pakketype
+        "type mgt subtype beacon or type mgt subtype probe-resp"
         if args.beacons_only else None
     )
 

@@ -1066,14 +1066,21 @@
       buildList(drones);
       updateStats();
 
-      // Refresh the detail panel if a drone is selected
-      if (selectedId) select(selectedId);
+	// Keep the selected drone highlighted without re-fetching the path
+	if (selectedId) {
+       		const drone = drones.find(function(d) { return d.id === selectedId; });
+		if (drone) {
+          		document.getElementById('d-x').textContent     = fmt(drone.x) + 'm';
+          		document.getElementById('d-y').textContent     = fmt(drone.y) + 'm';
+          		document.getElementById('d-z').textContent     = fmt(drone.z) + 'm';
+          		document.getElementById('d-last').textContent  = fmtTime(drone.last_seen);
+        }
+      }
     }
-
 
     // ── Start everything ─────────────────────────────────────────
     refresh();                          // load data immediately
-    setInterval(refresh, 3000);         // then every 3 seconds
+    setInterval(refresh, 1000);         // then every 1 seconds
     drawMap();                          // start drawing the map
 
   </script>

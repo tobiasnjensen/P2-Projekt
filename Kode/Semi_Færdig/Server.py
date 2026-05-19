@@ -1,6 +1,6 @@
 """
 @Author: Tobias Jensen
-@Date: 12/5/2026
+@Date: 12/5/2026.
 Beregningsserver der modtager afstandsmålinger fra Raspberry Pi'erne og estimerer positionen af den detekterede enhed ved hjælp af trilateration.
 Serveren lytter på en UDP-port for indkommende data, som forventes at være i JSON-format med følgende struktur:
 {
@@ -34,15 +34,15 @@ BUFFER_SIZE = 1024
 
 #--------Anchor Konfiguration--------#
 ANCHORS = {
-    "anchor_1": (0.5, 2, 1),
-    "anchor_2": (1, 1, 0),  
-    "anchor_3": (3, 1, 0),
-    "anchor_4": (3, 3, 0),
+    "anchor_1": (19.5, 8, 2),
+    "anchor_2": (30, 0, 0),  
+    "anchor_3": (7.5, 12.2, 1.3),
+    "anchor_4": (1, 1, 0.6),
 }
 
 #--------Database Konfiguration--------#
 DB_CONFIG = {
-    "host": "192.168.0.104",     #Skift til ip-adressen på din PostgreSQL server, eller localhost hvis det er på samme maskine
+    "host": "localhost",     #Skift til ip-adressen på din PostgreSQL server, eller localhost hvis det er på samme maskine
     "port": 5432,                
     "database": "DroneDatabase", 
     "user": "tobi",              #Tobias username = tobi
