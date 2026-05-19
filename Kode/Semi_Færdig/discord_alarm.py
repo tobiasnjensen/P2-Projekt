@@ -3,7 +3,7 @@ import json
 
 def send_discord_alarm(message):
     # Erstat med din faktiske Discord Webhook URL
-    webhook_url = "https://discord.com/api/webhooks/1503731455061266492/ykKqiX3_BOSIeyfj1d9kF5yRuMeQ64adMxD3uLaC7wpqdaBTL0iRavszEU-ZPWBl4osf"
+    webhook_url = "IDK"
     
     # Data der sendes til Discord
     data = {
