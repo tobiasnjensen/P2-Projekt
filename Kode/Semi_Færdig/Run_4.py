@@ -28,7 +28,7 @@ ROLLING_WINDOW = int(input("Enter rolling average window size (default 10): ") o
 
 stop_event = threading.Event() #Opretter et threading Event-objekt der bruges til at stoppe sniffing-loopet på tværs af tråde
 
-def rssi_to_distance(rssi, tx_power=-13, path_loss_exp=2.7) -> float:
+def rssi_to_distance(rssi, tx_power=-40, path_loss_exp=2.7) -> float:
     """
     Konverterer en RSSI-værdi til en estimeret afstand i meter ved hjælp af log-distance path loss modellen.
     args:

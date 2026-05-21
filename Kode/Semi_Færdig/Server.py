@@ -35,7 +35,7 @@ BUFFER_SIZE = 1024
 #--------Anchor Konfiguration--------#
 ANCHORS = {
     "anchor_1": (19.5, 8, 2),
-    "anchor_2": (30, 0, 0),  
+    "anchor_2": (30, 1, 0),  
     "anchor_3": (7.5, 12.2, 1.3),
     "anchor_4": (1, 1, 0.6),
 }

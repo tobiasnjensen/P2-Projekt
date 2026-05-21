@@ -379,7 +379,7 @@
   <!-- Top bar -->
   <div class="topbar">
     <div>
-      <div class="topbar-title">🛸 Drone Detection</div>
+      <div class="topbar-title">Drone Detection</div>
       <div class="topbar-sub">Local coordinate space · x / y / z (altitude)</div>
     </div>
     <div style="display:flex; align-items:center; gap:14px;">
@@ -394,28 +394,24 @@
   <!-- Stats row -->
   <div class="stats">
     <div class="stat-card">
-      <div class="stat-icon">🛸</div>
       <div>
         <div class="stat-val" id="s-total">—</div>
         <div class="stat-lbl">Tracked</div>
       </div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">✅</div>
       <div>
         <div class="stat-val" style="color:#16a34a;" id="s-active">—</div>
         <div class="stat-lbl">Active</div>
       </div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">📈</div>
       <div>
         <div class="stat-val" style="color:#2563eb;" id="s-maxalt">—</div>
         <div class="stat-lbl">Max altitude</div>
       </div>
     </div>
     <div class="stat-card">
-      <div class="stat-icon">🕐</div>
       <div>
         <div class="stat-val" style="font-size:15px; margin-top:3px;" id="s-time">—</div>
         <div class="stat-lbl">Last update</div>
@@ -431,7 +427,7 @@
 
       <!-- Query form -->
       <div class="panel">
-        <div class="panel-header">🔍 Query database</div>
+        <div class="panel-header">Search in database</div>
         <div class="query-form">
           <div>
             <div class="field-label">MAC address</div>
@@ -548,322 +544,227 @@
   <script>
 
     // ── Configuration ────────────────────────────────────────────
-    // Change this to the address where your Python API is running.
     const API = 'http://localhost:8000';
-
-    // Colours used for each drone (cycles if there are more than 7)
     const COLORS = ['#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#65a30d', '#dc2626'];
 
-
     // ── State ────────────────────────────────────────────────────
-    // These variables hold the current state of the app.
-    // They are updated whenever new data arrives.
+    let drones      = [];
+    let allBounds   = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
+    let bounds      = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
+    let selectedId  = null;   // always a STRING or null
+    let useRealApi  = false;
+    let tick        = 0;
+    let activePath  = [];     // points for the selected drone
+    let activeFrom      = null;
+    let activeTo        = null;
+    let filteredDrones  = null;   // null means no active search filter
 
-    let drones    = [];    // list of all drone objects
-    let paths     = {};    // flight path points, keyed by drone id: { 1: [...], 2: [...] }
-    let bounds    = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
-    let selectedId = null; // the id of the currently selected drone, or null
-    let useRealApi = false; // becomes true once we successfully connect to your API
-    let tick = 0;          // counts animation frames — used to animate the pulse ring
-
-
-    // ── Helper functions ─────────────────────────────────────────
-
-    // Rounds a number to 1 decimal place, or returns '—' if it's null/undefined
-    function fmt(value, decimals = 1) {
-      if (value == null) return '—';
-      return Number(value).toFixed(decimals);
+    // ── Helpers ──────────────────────────────────────────────────
+    function fmt(v, d = 1) { return v == null ? '—' : Number(v).toFixed(d); }
+    function fmtTime(ts) {
+      if (!ts) return '—';
+      const d = new Date(ts);
+      return isNaN(d) ? ts : d.toLocaleTimeString();
     }
-
-    // Converts a timestamp string to a readable time like "14:32:07"
-    function fmtTime(timestamp) {
-      if (!timestamp) return '—';
-      const d = new Date(timestamp);
-      if (isNaN(d)) return timestamp; // return as-is if it's not a valid date
-      return d.toLocaleTimeString();
-    }
-
-    // Returns the colour for a given drone index
-    function colorFor(index) {
-      return COLORS[index % COLORS.length];
-    }
-
+    function colorFor(i) { return COLORS[i % COLORS.length]; }
+    function sid(id) { return String(id); }   // always convert ids to string
 
     // ── Demo data ────────────────────────────────────────────────
-    // Used when the API is not reachable — so you can see and test
-    // the dashboard without running the Python server.
-
     function makeDemoData() {
       return [
-        { id: 1, mac_adresse: 'AA:BB:CC:11:22:33', x: 2.1, y: 3.4, z: 1.2,
-          first_seen: new Date(Date.now() - 3600000).toISOString(),
-          last_seen: new Date().toISOString() },
-        { id: 2, mac_adresse: 'DD:EE:FF:44:55:66', x: 6.5, y: 7.1, z: 0.8,
-          first_seen: new Date(Date.now() - 1800000).toISOString(),
-          last_seen: new Date().toISOString() },
-        { id: 3, mac_adresse: '11:22:33:AA:BB:CC', x: 4.8, y: 1.9, z: 2.1,
-          first_seen: new Date(Date.now() - 900000).toISOString(),
-          last_seen: new Date().toISOString() },
-        { id: 4, mac_adresse: '44:55:66:DD:EE:FF', x: 8.2, y: 5.5, z: 0.3,
-          first_seen: new Date(Date.now() - 600000).toISOString(),
-          last_seen: new Date().toISOString() },
+        { id: '1', mac_adresse: 'AA:BB:CC:11:22:33', x: 2.1, y: 3.4, z: 1.2, last_seen: new Date().toISOString() },
+        { id: '2', mac_adresse: 'DD:EE:FF:44:55:66', x: 6.5, y: 7.1, z: 0.8, last_seen: new Date().toISOString() },
+        { id: '3', mac_adresse: '11:22:33:AA:BB:CC', x: 4.8, y: 1.9, z: 2.1, last_seen: new Date().toISOString() },
       ];
     }
-
-    // Creates a fake flight path for a drone (a series of positions over time)
     function makeDemoPath(drone) {
-      const points = [];
-      let x = drone.x, y = drone.y, z = drone.z;
-      for (let i = 0; i < 16; i++) {
+      const pts = []; let x = drone.x, y = drone.y, z = drone.z || 0;
+      for (let i = 0; i < 20; i++) {
         x += (Math.random() - 0.5) * 0.8;
         y += (Math.random() - 0.5) * 0.8;
         z = Math.max(0, z + (Math.random() - 0.5) * 0.3);
-        points.push({
-          x, y, z,
-          timestamp: new Date(Date.now() - (16 - i) * 15000).toISOString()
-        });
+        pts.push({ x, y, z, timestamp: new Date(Date.now() - (20 - i) * 15000).toISOString() });
       }
-      return points;
+      return pts;
     }
-
 
     // ── API calls ────────────────────────────────────────────────
-    // These functions fetch data from your Python FastAPI server.
-    // If the server is not running, they return null and we fall
-    // back to demo data instead.
+    async function apiFetch(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error();
+        return await r.json();
+      } catch { return null; }
+    }
 
     async function fetchDrones() {
-      try {
-        const response = await fetch(`${API}/drones`);
-        if (!response.ok) throw new Error('Bad response');
-        return await response.json();
-      } catch (e) {
-        return null; // API not reachable
-      }
+      return apiFetch(`${API}/drones`);
     }
-
     async function fetchBounds() {
-      try {
-        const response = await fetch(`${API}/bounds`);
-        if (!response.ok) throw new Error('Bad response');
-        return await response.json();
-      } catch (e) {
-        return null;
-      }
+      return apiFetch(`${API}/bounds`);
     }
-
-    async function fetchPath(deviceId) {
-      try {
-        const response = await fetch(`${API}/drones/${deviceId}/path`);
-        if (!response.ok) throw new Error('Bad response');
-        return await response.json();
-      } catch (e) {
-        return null;
-      }
+    async function fetchPath(deviceId, fromTime, toTime) {
+      let url = `${API}/drones/${deviceId}/path?`;
+      if (fromTime) url += `from_time=${encodeURIComponent(fromTime)}&`;
+      if (toTime)   url += `to_time=${encodeURIComponent(toTime)}&`;
+      return apiFetch(url);
     }
-
     async function fetchSearch(mac, fromTime, toTime) {
-      try {
-        let url = `${API}/drones/search?`;
-        if (mac)      url += `mac_adresse=${encodeURIComponent(mac)}&`;
-        if (fromTime) url += `from_time=${encodeURIComponent(fromTime)}&`;
-        if (toTime)   url += `to_time=${encodeURIComponent(toTime)}&`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Bad response');
-        return await response.json();
-      } catch (e) {
-        return null;
-      }
+      let url = `${API}/drones/search?`;
+      if (mac)      url += `mac_adresse=${encodeURIComponent(mac)}&`;
+      if (fromTime) url += `from_time=${encodeURIComponent(fromTime)}&`;
+      if (toTime)   url += `to_time=${encodeURIComponent(toTime)}&`;
+      return apiFetch(url);
     }
 
-
-    // ── Stats bar ────────────────────────────────────────────────
-    // Updates the four number cards at the top of the page.
-
+    // ── Stats ────────────────────────────────────────────────────
     function updateStats() {
-      document.getElementById('s-total').textContent = drones.length;
-      document.getElementById('s-active').textContent = drones.length;
-      const maxZ = drones.reduce((max, d) => Math.max(max, d.z || 0), 0);
-      document.getElementById('s-maxalt').textContent = fmt(maxZ) + 'm';
-      document.getElementById('s-time').textContent = new Date().toLocaleTimeString();
+      document.getElementById('s-total').textContent   = drones.length;
+      document.getElementById('s-active').textContent  = drones.length;
+      const maxZ = drones.reduce((m, d) => Math.max(m, d.z || 0), 0);
+      document.getElementById('s-maxalt').textContent  = fmt(maxZ) + 'm';
+      document.getElementById('s-time').textContent    = new Date().toLocaleTimeString();
     }
-
 
     // ── Drone list ───────────────────────────────────────────────
-    // Builds the clickable list of drones in the left sidebar.
-
     function buildList(list) {
-      const container = document.getElementById('drone-list');
+      const el = document.getElementById('drone-list');
       document.getElementById('drone-count').textContent = list.length;
-
-      // If the list is empty, show a message instead
-      if (list.length === 0) {
-        container.innerHTML = '<div class="empty">No drones found</div>';
-        return;
-      }
-
-      // Clear the container, then add one row per drone
-      container.innerHTML = '';
+      if (!list.length) { el.innerHTML = '<div class="empty">No drones found</div>'; return; }
+      el.innerHTML = '';
       list.forEach(function(drone) {
-        const index = drones.indexOf(drone);
-        const color = colorFor(index);
-        const isSelected = selectedId === drone.id;
-
-        // Create a div for this drone row
-        const row = document.createElement('div');
-        row.className = 'drone-row' + (isSelected ? ' selected' : '');
-
-        // Fill it with HTML
+        const idx   = drones.findIndex(function(d) { return sid(d.id) === sid(drone.id); });
+        const color = colorFor(idx);
+        const isSel = selectedId === sid(drone.id);
+        const row   = document.createElement('div');
+        row.className = 'drone-row' + (isSel ? ' selected' : '');
         row.innerHTML = `
-          <div class="drone-dot" style="background: ${color};"></div>
+          <div class="drone-dot" style="background:${color}"></div>
           <div>
             <div class="drone-name">Device ${drone.id}</div>
             <div class="drone-coords">${drone.mac_adresse}</div>
           </div>
-          <span class="drone-badge">x:${fmt(drone.x)} y:${fmt(drone.y)}</span>
-        `;
-
-        // When clicked, select this drone
-        row.onclick = function() { select(drone.id); };
-
-        container.appendChild(row);
+          <span class="drone-badge">x:${fmt(drone.x)} y:${fmt(drone.y)}</span>`;
+        row.onclick = function() { selectDrone(sid(drone.id)); };
+        el.appendChild(row);
       });
     }
 
-
-    // ── Select a drone ───────────────────────────────────────────
-    // Called when the user clicks a drone row or a dot on the map.
-    // Shows the detail panel and flight log for that drone.
-
-    async function select(id) {
-      // If the same drone is clicked again, deselect it
-      if (selectedId === id) {
-        clearSelection();
-        return;
-      }
-
+    // ── Select drone ─────────────────────────────────────────────
+    async function selectDrone(id) {
+      // id is always a string here
+      if (selectedId === id) { clearSelection(); return; }
       selectedId = id;
-      buildList(drones); // rebuild list so the selected row gets highlighted
+      buildList(drones);
 
-      const drone = drones.find(function(d) { return d.id === id; });
+      const drone = drones.find(function(d) { return sid(d.id) === id; });
       if (!drone) return;
 
-      // Show the detail panel
-      const panel = document.getElementById('detail-panel');
-      panel.style.display = 'block';
+      document.getElementById('detail-panel').style.display = 'block';
+      document.getElementById('detail-title').textContent   = `Device ${drone.id}`;
+      document.getElementById('d-mac').textContent          = drone.mac_adresse;
+      document.getElementById('d-x').textContent            = fmt(drone.x) + 'm';
+      document.getElementById('d-y').textContent            = fmt(drone.y) + 'm';
+      document.getElementById('d-z').textContent            = fmt(drone.z) + 'm';
+      document.getElementById('d-first').textContent        = fmtTime(drone.last_seen);
+      document.getElementById('d-last').textContent         = fmtTime(drone.last_seen);
 
-      // Fill in the detail fields
-      document.getElementById('detail-title').textContent = `Device ${drone.id}`;
-      document.getElementById('d-mac').textContent   = drone.mac_adresse;
-      document.getElementById('d-x').textContent     = fmt(drone.x) + 'm';
-      document.getElementById('d-y').textContent     = fmt(drone.y) + 'm';
-      document.getElementById('d-z').textContent     = fmt(drone.z) + 'm';
-      document.getElementById('d-first').textContent = fmtTime(drone.first_seen);
-      document.getElementById('d-last').textContent  = fmtTime(drone.last_seen);
+      // Fetch path with active time filter
+      let pts = useRealApi ? await fetchPath(drone.id, activeFrom, activeTo) : null;
+      if (!pts || pts.length === 0) pts = useRealApi ? [] : makeDemoPath(drone);
+      activePath = pts;
 
-      // Fetch the flight path (real API or demo)
-      let points = useRealApi ? await fetchPath(id) : null;
-      if (!points) points = makeDemoPath(drone);
-      paths[id] = points;
+      // Update timestamps from path
+      if (pts.length > 0) {
+        document.getElementById('d-first').textContent = fmtTime(pts[0].timestamp);
+        document.getElementById('d-last').textContent  = fmtTime(pts[pts.length - 1].timestamp);
+      }
 
-      // Fill the flight log table
+      // Zoom map to fit the path
+      if (pts.length > 0) {
+        const xs = pts.map(function(p) { return p.x; });
+        const ys = pts.map(function(p) { return p.y; });
+        const xMin = Math.min(...xs), xMax = Math.max(...xs);
+        const yMin = Math.min(...ys), yMax = Math.max(...ys);
+        const xM = Math.max((xMax - xMin) * 0.15, 1);
+        const yM = Math.max((yMax - yMin) * 0.15, 1);
+        bounds = { x_min: xMin - xM, x_max: xMax + xM, y_min: yMin - yM, y_max: yMax + yM };
+      }
+
+      // Fill flight log table
       const tbody = document.getElementById('path-tbody');
       tbody.innerHTML = '';
-      points.forEach(function(pt, i) {
-        tbody.innerHTML += `
-          <tr>
-            <td style="color:#aaa;">${i + 1}</td>
-            <td>${fmt(pt.x)}</td>
-            <td>${fmt(pt.y)}</td>
-            <td>${fmt(pt.z)}</td>
-            <td style="color:#aaa;">${fmtTime(pt.timestamp)}</td>
-          </tr>
-        `;
+      pts.forEach(function(pt, i) {
+        tbody.innerHTML += `<tr>
+          <td style="color:#aaa">${i + 1}</td>
+          <td>${fmt(pt.x)}</td><td>${fmt(pt.y)}</td><td>${fmt(pt.z)}</td>
+          <td style="color:#aaa">${fmtTime(pt.timestamp)}</td>
+        </tr>`;
       });
     }
 
-    // Hides the detail panel and deselects everything
     function clearSelection() {
       selectedId = null;
+      activePath = [];
+      bounds = { ...allBounds };
       buildList(drones);
       document.getElementById('detail-panel').style.display = 'none';
     }
 
-
     // ── Query / search ───────────────────────────────────────────
-    // Called when the user clicks the Search button.
-
     async function runQuery() {
-      const mac      = document.getElementById('q-mac').value.trim();
-      const fromTime = document.getElementById('q-from').value;
-      const toTime   = document.getElementById('q-to').value;
+      const mac  = document.getElementById('q-mac').value.trim();
+      const from = document.getElementById('q-from').value;
+      const to   = document.getElementById('q-to').value;
+      activeFrom = from || null;
+      activeTo   = to   || null;
+
+      let filtered = drones;
 
       if (useRealApi) {
-        // Ask the Python API to filter
-        const matchingIds = await fetchSearch(mac, fromTime, toTime);
-        if (matchingIds) {
-          const filtered = drones.filter(function(d) {
-            return matchingIds.includes(d.id);
+        const ids = await fetchSearch(mac, from, to);
+        if (ids && ids.length >= 0) {
+          filtered = drones.filter(function(d) {
+            return ids.some(function(rid) { return sid(rid) === sid(d.id); });
           });
-          buildList(filtered);
-          return;
         }
+      } else if (mac) {
+        filtered = drones.filter(function(d) {
+          return d.mac_adresse.toLowerCase().includes(mac.toLowerCase());
+        });
       }
 
-      // Fallback: filter locally by MAC address
-      const filtered = mac
-        ? drones.filter(function(d) {
-            return d.mac_address.toLowerCase().includes(mac.toLowerCase());
-          })
-        : drones;
-
-      buildList(filtered);
+      filteredDrones = filtered;
+      clearSelection();
+      buildList(filteredDrones);
     }
 
-    // Clears all query inputs and resets the list
     function resetAll() {
       document.getElementById('q-mac').value  = '';
       document.getElementById('q-from').value = '';
       document.getElementById('q-to').value   = '';
+      activeFrom     = null;
+      activeTo       = null;
+      filteredDrones = null;
       clearSelection();
       buildList(drones);
     }
 
-
-    // ── Map drawing ──────────────────────────────────────────────
-    // The map is drawn on an HTML <canvas> element.
-    // Every animation frame, we clear it and redraw everything.
-
+    // ── Map ──────────────────────────────────────────────────────
     const canvas = document.getElementById('map');
-    const ctx    = canvas.getContext('2d'); // the "pen" we draw with
-    const PAD    = 48; // padding in pixels around the edge of the map
+    const ctx    = canvas.getContext('2d');
+    const PAD    = 48;
 
-    // Converts a drone's x/y coordinates into canvas pixel positions.
-    // This is what makes the map auto-scale to your coordinate space.
     function toCanvas(x, y) {
       const w = canvas.width  - PAD * 2;
       const h = canvas.height - PAD * 2;
-
-      // How far across the coordinate space is this point? (0.0 to 1.0)
-      const ratioX = bounds.x_max === bounds.x_min
-        ? 0.5
-        : (x - bounds.x_min) / (bounds.x_max - bounds.x_min);
-
-      // y is flipped because canvas 0 is at the top, but we want 0 at the bottom
-      const ratioY = bounds.y_max === bounds.y_min
-        ? 0.5
-        : (y - bounds.y_min) / (bounds.y_max - bounds.y_min);
-
-      return {
-        cx: PAD + ratioX * w,
-        cy: PAD + (1 - ratioY) * h
-      };
+      const rx = bounds.x_max === bounds.x_min ? 0.5 : (x - bounds.x_min) / (bounds.x_max - bounds.x_min);
+      const ry = bounds.y_max === bounds.y_min ? 0.5 : (y - bounds.y_min) / (bounds.y_max - bounds.y_min);
+      return { cx: PAD + rx * w, cy: PAD + (1 - ry) * h };
     }
 
     function drawMap() {
       tick++;
-
-      // Make canvas match its displayed size (important for sharpness)
       canvas.width  = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
 
@@ -871,217 +772,151 @@
       ctx.fillStyle = '#f5f5f3';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Grid lines
-      ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-      ctx.lineWidth = 1;
-      for (let x = 0; x < canvas.width; x += 40) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += 40) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
-      }
+      // Grid
+      ctx.strokeStyle = 'rgba(0,0,0,0.06)'; ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width;  x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+      for (let y = 0; y < canvas.height; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y);  ctx.stroke(); }
 
-      // Border around the coordinate area
+      // Border
       ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-      ctx.strokeRect(PAD, PAD, canvas.width - PAD * 2, canvas.height - PAD * 2);
+      ctx.strokeRect(PAD, PAD, canvas.width - PAD*2, canvas.height - PAD*2);
 
-      // Update the bounds label (top right of map header)
+      // Bounds label
       const xRange = (bounds.x_max - bounds.x_min) || 1;
       const yRange = (bounds.y_max - bounds.y_min) || 1;
       document.getElementById('bounds-label').textContent =
-        `x: 0–${fmt(xRange, 0)}m · y: 0–${fmt(yRange, 0)}m`;
+        `x: ${fmt(bounds.x_min,0)}–${fmt(bounds.x_max,0)}m · y: ${fmt(bounds.y_min,0)}–${fmt(bounds.y_max,0)}m`;
 
-      // Draw flight paths (dashed lines connecting historical positions)
-      Object.entries(paths).forEach(function([id, points]) {
-        if (points.length < 2) return;
-        const drone = drones.find(function(d) { return d.id == id; });
-        const color = drone ? colorFor(drones.indexOf(drone)) : '#888';
-        const isSelected = selectedId == id;
-
+      // Draw flight path if a drone is selected
+      if (selectedId && activePath.length >= 2) {
+        const drone = drones.find(function(d) { return sid(d.id) === selectedId; });
+        const color = drone ? colorFor(drones.findIndex(function(d) { return sid(d.id) === selectedId; })) : '#2563eb';
         ctx.beginPath();
-        points.forEach(function(pt, i) {
+        activePath.forEach(function(pt, i) {
           const { cx, cy } = toCanvas(pt.x, pt.y);
-          if (i === 0) ctx.moveTo(cx, cy);
-          else         ctx.lineTo(cx, cy);
+          i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
         });
-
-        ctx.strokeStyle = color + (isSelected ? 'cc' : '44'); // cc = 80% opacity, 44 = 27%
-        ctx.lineWidth   = isSelected ? 2 : 1;
-        ctx.setLineDash([4, 4]); // dashed line
+        ctx.strokeStyle = color + 'cc';
+        ctx.lineWidth   = 2;
+        ctx.setLineDash([4, 4]);
         ctx.stroke();
-        ctx.setLineDash([]); // reset to solid for next drawing
-      });
+        ctx.setLineDash([]);
+      }
 
-      // Draw each drone as a coloured dot with a label
+      // Draw drone dots
       drones.forEach(function(drone, index) {
         if (drone.x == null || drone.y == null) return;
+        const isSel = sid(drone.id) === selectedId;
+        if (selectedId && !isSel) return;   // hide others when one is selected
 
         const { cx, cy } = toCanvas(drone.x, drone.y);
-        const color      = colorFor(index);
-        const isSelected = selectedId === drone.id;
+        const color = colorFor(index);
 
-        // Animated pulse ring around the selected drone
-        if (isSelected) {
-          const pulseRadius = 16 + (tick % 24) * 0.5;
-          ctx.beginPath();
-          ctx.arc(cx, cy, pulseRadius, 0, Math.PI * 2);
-          ctx.strokeStyle = color + '44';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
+        // Pulse ring
+        if (isSel) {
+          const pr = 16 + (tick % 24) * 0.5;
+          ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI*2);
+          ctx.strokeStyle = color + '44'; ctx.lineWidth = 1.5; ctx.stroke();
         }
 
-        // Main dot
-        ctx.beginPath();
-        ctx.arc(cx, cy, isSelected ? 9 : 6, 0, Math.PI * 2);
-        ctx.fillStyle   = color;
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth   = 1.5;
-        ctx.stroke();
+        // Dot
+        ctx.beginPath(); ctx.arc(cx, cy, isSel ? 9 : 6, 0, Math.PI*2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
 
-        // Label: device ID
-        ctx.fillStyle = '#222';
-        ctx.font      = `${isSelected ? 12 : 11}px Arial`;
+        // Labels
+        ctx.fillStyle = '#222'; ctx.font = `${isSel ? 12 : 11}px Arial`;
         ctx.fillText(`#${drone.id}`, cx + 11, cy + 4);
-
-        // Label: altitude below
         if (drone.z != null) {
-          ctx.fillStyle = '#888';
-          ctx.font      = '10px Arial';
+          ctx.fillStyle = '#888'; ctx.font = '10px Arial';
           ctx.fillText(`z: ${fmt(drone.z)}m`, cx + 11, cy + 16);
         }
       });
 
-      // Keep redrawing every animation frame (~60 times per second)
       requestAnimationFrame(drawMap);
     }
 
-
     // ── Map interaction ──────────────────────────────────────────
-    // Hover to show tooltip, click to select a drone.
-
     canvas.addEventListener('mousemove', function(e) {
-      const rect   = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      // Check if the mouse is close to any drone dot
+      const r = canvas.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
       let hovered = null;
       drones.forEach(function(drone) {
         if (drone.x == null) return;
+        if (selectedId && sid(drone.id) !== selectedId) return;
         const { cx, cy } = toCanvas(drone.x, drone.y);
-        if (Math.hypot(mouseX - cx, mouseY - cy) < 14) {
-          hovered = drone;
-        }
+        if (Math.hypot(mx - cx, my - cy) < 14) hovered = drone;
       });
-
-      const tooltip = document.getElementById('map-tooltip');
-      if (hovered) {
-        tooltip.innerHTML = `
-          <strong>Device ${hovered.id}</strong>
-          ${hovered.mac_adresse}<br>
-          x: ${fmt(hovered.x)}m &nbsp; y: ${fmt(hovered.y)}m &nbsp; z: ${fmt(hovered.z)}m
-        `;
-      } else {
-        tooltip.textContent = 'Hover over a drone to see details';
-      }
+      const tip = document.getElementById('map-tooltip');
+      tip.innerHTML = hovered
+        ? `<strong>Device ${hovered.id}</strong>${hovered.mac_adresse}<br>x: ${fmt(hovered.x)}m &nbsp; y: ${fmt(hovered.y)}m &nbsp; z: ${fmt(hovered.z)}m`
+        : 'Hover over a drone to see details';
     });
 
     canvas.addEventListener('click', function(e) {
-      const rect   = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
+      const r = canvas.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
       drones.forEach(function(drone) {
         if (drone.x == null) return;
         const { cx, cy } = toCanvas(drone.x, drone.y);
-        if (Math.hypot(mouseX - cx, mouseY - cy) < 14) {
-          select(drone.id);
-        }
+        if (Math.hypot(mx - cx, my - cy) < 14) selectDrone(sid(drone.id));
       });
     });
 
-
-    // ── Main refresh loop ────────────────────────────────────────
-    // Runs every 3 seconds. Tries to fetch real data from the API.
-    // If not available, simulates movement on the demo data.
-
+    // ── Refresh loop ─────────────────────────────────────────────
     async function refresh() {
-      const realData = await fetchDrones();
+      const real = await fetchDrones();
 
-      if (realData !== null) {
-        // Real API is working (even if the list is empty)
-        drones     = realData;
+      if (real !== null) {
         useRealApi = true;
+        // Normalise all IDs to strings
+        drones = real.map(function(d) { return Object.assign({}, d, { id: sid(d.id) }); });
         document.getElementById('api-status').textContent = 'Connected to database';
         document.getElementById('api-status').style.color = '#16a34a';
-        paths = {}; // clear any leftover paths when database is empty
 
         if (drones.length > 0) {
-          // Fetch coordinate bounds for auto-scaling the map
           const b = await fetchBounds();
           if (b && b.x_min != null) {
-            bounds = b;
-          } else {
-            bounds = {
-              x_min: Math.min(...drones.map(function(d) { return d.x || 0; })),
-              x_max: Math.max(...drones.map(function(d) { return d.x || 0; })),
-              y_min: Math.min(...drones.map(function(d) { return d.y || 0; })),
-              y_max: Math.max(...drones.map(function(d) { return d.y || 0; })),
-            };
+            allBounds = b;
+            if (!selectedId) bounds = { ...allBounds };
           }
         }
-
       } else {
-        // API not reachable — use demo data
         document.getElementById('api-status').textContent = 'Using demo data';
         document.getElementById('api-status').style.color = '#aaa';
-
-        if (drones.length === 0) {
-          // First load — create demo drones and their paths
+        if (!drones.length) {
           drones = makeDemoData();
-          bounds = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
-          drones.forEach(function(d) { paths[d.id] = makeDemoPath(d); });
-        } else {
-          // Simulate movement: nudge each drone slightly
-          drones.forEach(function(drone) {
-            drone.x        += (Math.random() - 0.5) * 0.25;
-            drone.y        += (Math.random() - 0.5) * 0.25;
-            drone.z         = Math.max(0, drone.z + (Math.random() - 0.5) * 0.15);
-            drone.last_seen = new Date().toISOString();
-
-            // Add the new position to this drone's path
-            if (paths[drone.id]) {
-              paths[drone.id].push({
-                x: drone.x, y: drone.y, z: drone.z,
-                timestamp: drone.last_seen
-              });
-              // Keep the path at most 40 points
-              if (paths[drone.id].length > 40) paths[drone.id].shift();
-            }
-          });
+          allBounds = { x_min: 0, x_max: 10, y_min: 0, y_max: 10 };
+          bounds = { ...allBounds };
         }
       }
 
-      buildList(drones);
+      // If a search filter is active, re-apply it to the updated drone list
+      if (filteredDrones !== null) {
+        const ids = filteredDrones.map(function(d) { return d.id; });
+        filteredDrones = drones.filter(function(d) { return ids.includes(d.id); });
+        buildList(filteredDrones);
+      } else {
+        buildList(drones);
+      }
       updateStats();
 
-	// Keep the selected drone highlighted without re-fetching the path
-	if (selectedId) {
-       		const drone = drones.find(function(d) { return d.id === selectedId; });
-		if (drone) {
-          		document.getElementById('d-x').textContent     = fmt(drone.x) + 'm';
-          		document.getElementById('d-y').textContent     = fmt(drone.y) + 'm';
-          		document.getElementById('d-z').textContent     = fmt(drone.z) + 'm';
-          		document.getElementById('d-last').textContent  = fmtTime(drone.last_seen);
+      // Keep detail panel updated without re-fetching path
+      if (selectedId) {
+        const drone = drones.find(function(d) { return d.id === selectedId; });
+        if (drone) {
+          document.getElementById('d-x').textContent    = fmt(drone.x) + 'm';
+          document.getElementById('d-y').textContent    = fmt(drone.y) + 'm';
+          document.getElementById('d-z').textContent    = fmt(drone.z) + 'm';
         }
       }
     }
 
-    // ── Start everything ─────────────────────────────────────────
-    refresh();                          // load data immediately
-    setInterval(refresh, 1000);         // then every 1 seconds
-    drawMap();                          // start drawing the map
+    // ── Start ────────────────────────────────────────────────────
+    refresh();
+    setInterval(refresh, 3000);
+    drawMap();
+
 
   </script>
 </body>
