@@ -9,7 +9,7 @@ from scipy.optimize import least_squares
 from OLS import tri_lat #OLS løsning som startgæt
 
 #-------IRLS Funktion-------#
-def tri_lat_irls(p1, d1, p2, d2, p3, d3, p4, d4, max_iters=10, tol=1) -> np.ndarray:
+def tri_lat_irls(p1, d1, p2, d2, p3, d3, p4, d4, max_iters=10, tol=1e-1) -> np.ndarray:
     """
     Trilateration med Iteratively Reweighted Least Squares (IRLS).
     args:

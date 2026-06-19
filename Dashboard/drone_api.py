@@ -120,7 +120,7 @@ async def get_flight_path(
     device_id: int,
     from_time: Optional[datetime] = Query(None),
     to_time:   Optional[datetime] = Query(None),
-    limit:     int                = Query(500),
+    limit:     int                = Query(1000),
 ):
     """
     Returns the ordered position history for one drone.

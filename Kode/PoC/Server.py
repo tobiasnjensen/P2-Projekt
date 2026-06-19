@@ -34,10 +34,10 @@ BUFFER_SIZE = 1024
 
 #--------Anchor Konfiguration--------#
 ANCHORS = {
-    "anchor_1": (19.5, 8, 2),
-    "anchor_2": (30, 1, 0),  
-    "anchor_3": (7.5, 12.2, 1.3),
-    "anchor_4": (1, 1, 0.6),
+    "anchor_1": (2.5,4,1.1),
+    "anchor_2": (6.6,-1,0.34),  
+    "anchor_3": (15.2,0,0.85),
+    "anchor_4": (15,3.8,0.61),
 }
 
 #--------Database Konfiguration--------#
@@ -183,13 +183,13 @@ def try_trilaterate(bssid)-> None:
             positions[bssid] = {"position": x_hat, "timestamp": timestamp}
         gem_position(db_conn, bssid, float(x_hat[0]), float(x_hat[1]), float(x_hat[2])) #Gemmer den estimerede position i databasen
         update_history(bssid, float(x_hat[0]), float(x_hat[1]), float(x_hat[2]), time.time()) #Opdaterer historikken for denne BSSID i identik.py
-        if is_drone(bssid) and bssid not in alarmed_bssids: #Tjekker om enheden opfører sig som en drone og om der ikke allerede er sendt en alarm for denne BSSID
+        """if is_drone(bssid) and bssid not in alarmed_bssids: #Tjekker om enheden opfører sig som en drone og om der ikke allerede er sendt en alarm for denne BSSID
             alarmed_bssids.add(bssid) 
             elapsed = time.time() - _first_seen[bssid]
             send_discord_alarm(bssid, x_hat) #Sender en alarm til Discord med BSSID og position #NOTE Husk at tilføje webhook
             console.print(f"[bold red]DRONE DETEKTERET: {bssid}[/bold red]")
             print(f"Tid fra første måling til klassificering: {elapsed:.2f} sekunder")
-
+"""
         with measurements_lock:
             measurements[bssid] = {}  # Ryd op i målinger for denne BSSID efter trilateration
 

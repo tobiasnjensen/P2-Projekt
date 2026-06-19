@@ -27,7 +27,7 @@ from scapy.all import sniff, RadioTap, Dot11, Dot11Beacon, Dot11ProbeResp
 #-----------------------------------------#
 
 #--------Server Konfiguration--------#
-SERVER_IP = "192.168.0.108" 
+SERVER_IP = "192.168.0.100" 
 UDP_PORT = 6769
 
 #--------Diverse variabler--------#
@@ -40,7 +40,7 @@ stop_event = threading.Event() #Opretter et threading Event-objekt der bruges ti
 #-----------------------------------------#
 
 #--------Beregningsfunktioner--------#
-def rssi_to_distance(rssi, tx_power=-40, path_loss_exp=2.7) -> float:
+def rssi_to_distance(rssi, tx_power=-18.7, path_loss_exp=2.5) -> float:
     """
     Konverterer en RSSI-værdi til en estimeret afstand i meter ved hjælp af log-distance path loss modellen.
     Den bør kalibreres for at finde en passende tx_power 
@@ -120,7 +120,7 @@ def get_ssid(packet) -> str: #Gammel funktion der ikke bruges men tør ikke slet
     return "<unknown>"
 
 
-def make_packet_handler(mac_filter: str | None, udp_sock, target_address)-> function:
+def make_packet_handler(mac_filter: str | None, udp_sock, target_address):
     """
     Funktion der opretter og returnerer en packet_handler-funktion med de givne parametre.
     Bruges til at indkapsle MAC-filter, UDP-socket og rolling average historik i handleren.
