@@ -7,7 +7,6 @@ Algoritmen bruger lineær algebra til at løse et system af ligninger, der er op
 
 #--------Imports--------#
 import numpy as np
-
 #--------Functions--------#
 def tri_lat(p1, d1, p2, d2, p3, d3, p4, d4) -> np.ndarray:
     #----Extract koordinater fra punkter----#
@@ -33,7 +32,6 @@ def tri_lat(p1, d1, p2, d2, p3, d3, p4, d4) -> np.ndarray:
     
     #Solve 
     solution = np.linalg.solve(A, b) #Løser det lineære ligningssystem for at finde x, y og z koordinaterne for den ukendte position
-    
 
     return solution  #Returnerer løsning som et array (vektor) med x, y og z koordinater
 
